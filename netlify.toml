@@ -1,0 +1,5 @@
+[build]
+  functions = "api/functions"  # Adjust this path if your functions folder is in a different location
+
+[functions]
+  # Other function-specific settings can go here
