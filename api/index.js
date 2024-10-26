@@ -8,7 +8,10 @@ const port = process.env.PORT || 3000;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
+const cors = require('cors');
 
+
+app.use(cors());
 
 // Middleware
 app.use(express.json());  // Parse JSON bodies
@@ -65,16 +68,30 @@ app.get('/users', (req, res) => {
 app.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    try {
+        const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
+        db.query(checkEmailQuery, [email], async (err, results) => {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+            if (results.length > 0) {
+                return res.status(400).json({ error: 'Email is already in use.' });
+            }
 
-    const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
-    db.query(sql, [name, email, hashedPassword], (err, result) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.status(201).json({ id: result.insertId, name, email });
-    });
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
+            db.query(sql, [name, email, hashedPassword], (err, result) => {
+                if (err) {
+                    return res.status(500).json({ error: err.message });
+                }
+                res.status(201).json({ id: result.insertId, name, email });
+            });
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
+
 
 
 app.post('/login', (req, res) => {
