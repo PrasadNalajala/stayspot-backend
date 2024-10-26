@@ -67,7 +67,7 @@ app.get('/users', (req, res) => {
 
 app.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
-
+    
     try {
         const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
         db.query(checkEmailQuery, [email], async (err, results) => {
@@ -112,8 +112,9 @@ app.post('/login', (req, res) => {
             return res.status(401).json({ error: 'Invalid password' });
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        // const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        res.json({ message: 'Login successful', token });
+        res.status(200).json({ message: 'Login successful'});
     });
 });
+
