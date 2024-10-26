@@ -1,13 +1,18 @@
+const dotenv = require('dotenv');
+dotenv.config();
+
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 3007;
-const dotenv = require('dotenv');
+const port = process.env.PORT || 3000;
+
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
 
-
-dotenv.config();
+// console.log('Connecting to database with the following credentials:');
+// console.log(`Host: ${process.env.DB_HOST}`);
+// console.log(`User: ${process.env.DB_USER}`);
+// console.log(`Database: ${process.env.DB_NAME}`);
 
 // Middleware
 app.use(express.json());  // Parse JSON bodies
@@ -25,10 +30,11 @@ app.listen(port, () => {
 
 // Create MySQL connection
 const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+    host: 'localhost',
+    user: 'root',
+    password: 'Admin@123',
+    database: 'stayspot_backend',
+    port: 3306
 });
 
 // Connect to MySQL
