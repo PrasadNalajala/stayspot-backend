@@ -9,10 +9,10 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
 
-// console.log('Connecting to database with the following credentials:');
-// console.log(`Host: ${process.env.DB_HOST}`);
-// console.log(`User: ${process.env.DB_USER}`);
-// console.log(`Database: ${process.env.DB_NAME}`);
+console.log('Connecting to database with the following credentials:');
+console.log(`Host: ${process.env.DB_HOST}`);
+console.log(`User: ${process.env.DB_USER}`);
+console.log(`Database: ${process.env.DB_NAME}`);
 
 // Middleware
 app.use(express.json());  // Parse JSON bodies
@@ -30,11 +30,10 @@ app.listen(port, () => {
 
 // Create MySQL connection
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Admin@123',
-    database: 'stayspot_backend',
-    port: 3306
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME
 });
 
 // Connect to MySQL
