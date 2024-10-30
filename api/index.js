@@ -14,7 +14,7 @@ const cors = require('cors');
 app.use(cors());
 
 // Middleware
-app.use(express.json());  // Parse JSON bodies
+app.use(express.json());
 
 // Basic route
 app.get('/', (req, res) => {
@@ -33,7 +33,7 @@ const db = mysql.createConnection({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
-});
+}).promise();
 
 // Connect to MySQL
 db.connect(err => {
@@ -116,3 +116,36 @@ app.post('/login', (req, res) => {
         res.status(200).json({ message: 'Login successful', token });
     });
 });
+
+app.get('/rentals',async(req,res)=>{
+    const query = 'SELECT * FROM rentals';
+    try {
+        const [result] = await db.query(query);
+        const formattedResult = result.map((rental) => ({
+            id: rental.id,
+            title: rental.title,
+            location: rental.location,
+            price: `₹${parseFloat(rental.price).toLocaleString()}/month`,
+            bedrooms: rental.bedrooms,
+            bathrooms: rental.bathrooms,
+            size: rental.size,
+            imageUrl: rental.imageUrl,
+            description: rental.description,
+            availableFrom: new Date(rental.available_from).toISOString().split('T')[0],
+            amenities: rental.amenities,  
+            status: rental.status,
+            contact: {
+                name: rental.contact_name,
+                phone: `+91 ${rental.contact_phone}`,
+                email: rental.contact_email
+            }
+        }));
+
+        res.json(formattedResult);
+    } catch (error) {
+        console.error("Error fetching rentals:", error);
+        res.status(500).send("Server Error");
+    }
+
+})
+
