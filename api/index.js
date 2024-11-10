@@ -30,15 +30,7 @@ app.listen(port, () => {
 });
 
 
-// Create MySQL connection
-// const db = mysql.createConnection({
-//     host: process.env.DB_HOST,
-//     user: process.env.DB_USER,
-//     password: process.env.DB_PASSWORD,
-//     database: process.env.DB_NAME
-// }).promise();
 
-// Connect to MySQL
 const db = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -158,3 +150,72 @@ app.get('/rentals',async(req,res)=>{
     }
 
 })
+
+app.post('/rentals', async (req, res) => {
+    console.log(req.body);
+    const { 
+        title, 
+        location, 
+        price, 
+        bedrooms, 
+        bathrooms, 
+        size, 
+        imageUrl, 
+        description, 
+        availableFrom, 
+        amenities,  
+        status, 
+        contact_name, 
+        contact_phone, 
+        contact_email 
+    } = req.body;
+
+    try {
+       
+        const amenitiesJSON = JSON.stringify(amenities);
+
+        const sql = `
+            INSERT INTO rentals 
+            (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const [result] = await db.query(sql, [
+            title, 
+            location, 
+            price, 
+            bedrooms, 
+            bathrooms, 
+            description, 
+            size, 
+            imageUrl || null,
+            contact_name, 
+            contact_phone, 
+            contact_email, 
+            availableFrom || null,
+            amenitiesJSON,  
+            status
+        ]);
+
+        res.status(201).json({
+            id: result.insertId, 
+            title, 
+            location, 
+            price, 
+            bedrooms, 
+            bathrooms, 
+            size, 
+            imageUrl, 
+            description, 
+            availableFrom, 
+            amenities, 
+            status, 
+            contact_name, 
+            contact_phone, 
+            contact_email
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+});
