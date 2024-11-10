@@ -10,6 +10,9 @@ const jwt = require('jsonwebtoken');
 const mysql = require('mysql2');
 const cors = require('cors');
 
+app.use(express.json());
+
+
 
 app.use(cors());
 
@@ -28,21 +31,30 @@ app.listen(port, () => {
 
 
 // Create MySQL connection
-const db = mysql.createConnection({
+// const db = mysql.createConnection({
+//     host: process.env.DB_HOST,
+//     user: process.env.DB_USER,
+//     password: process.env.DB_PASSWORD,
+//     database: process.env.DB_NAME
+// }).promise();
+
+// Connect to MySQL
+const db = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME
 }).promise();
 
-// Connect to MySQL
-db.connect(err => {
-    if (err) {
-        console.error('Error connecting to MySQL:', err);
-        return;
-    }
-    console.log('Connected to MySQL');
-});
+    db.getConnection()
+    .then(conn => {
+        console.log('Database connected successfully');
+        conn.release(); // Release the connection back to the pool
+        // Do something with the connection if needed
+    })
+    .catch(error => {
+        console.error('Error connecting to the database:', error);
+    });
 
 app.post('/users', (req, res) => {
     const { name, email } = req.body;
@@ -69,25 +81,15 @@ app.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
     
     try {
-        const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
-        db.query(checkEmailQuery, [email], async (err, results) => {
-            if (err) {
-                return res.status(500).json({ error: err.message });
-            }
-            if (results.length > 0) {
-                return res.status(400).json({ error: 'Email is already in use.' });
-            }
+        const [existingUsers] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (existingUsers.length > 0) {
+            return res.status(400).json({ error: 'Email is already in use.' });
+        }
 
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const sql = 'INSERT INTO users (name, email, password) VALUES (?, ?, ?)';
-            db.query(sql, [name, email, hashedPassword], (err, result) => {
-                if (err) {
-                    return res.status(500).json({ error: err.message });
-                }
-                const token = jwt.sign({ id: result.insertId, email }, process.env.JWT_SECRET, { expiresIn: '30d' });
-                res.status(201).json({ id: result.insertId, name, email, token });
-            });
-        });
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const token = jwt.sign({  email }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        const [result] = await db.query('INSERT INTO users (name, email, password, token) VALUES (?, ?, ?, ?)', [name, email, hashedPassword, token]);
+        res.status(201).json({ id: result.insertId, name, email, token });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -95,27 +97,35 @@ app.post('/register', async (req, res) => {
 
 
 
-app.post('/login', (req, res) => {
-    const { email, password } = req.body;
 
-    const sql = 'SELECT * FROM users WHERE email = ?';
-    db.query(sql, [email], async (err, results) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
+app.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    console.log('email:', email);
+
+    try {
+        const [results] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         if (results.length === 0) {
+            console.log('User not found');
             return res.status(401).json({ error: 'User not found' });
         }
 
         const user = results[0];
         const match = await bcrypt.compare(password, user.password);
         if (!match) {
+            console.log('Invalid password');
             return res.status(401).json({ error: 'Invalid password' });
         }
+
         const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '30d' });
+        console.log('Token generated:', token);
         res.status(200).json({ message: 'Login successful', token });
-    });
+    } catch (error) {
+        console.log('Catch error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
 });
+
+
 
 app.get('/rentals',async(req,res)=>{
     const query = 'SELECT * FROM rentals';
@@ -148,4 +158,3 @@ app.get('/rentals',async(req,res)=>{
     }
 
 })
-
