@@ -226,13 +226,13 @@ app.post("/rentals", async (req, res) => {
     res.status(500).json({ error: "Server Error" });
   }
 });
-app.get("/api/users", async (req, res) => {
-  const token = req.body.token;
+app.get("/api/user", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
   if (!token) {
     return res.status(400).json({ message: "Token is required" });
   }
   const query =
-    "SELECT name, email,created_at, profile_url FROM users WHERE token = ?";
+    "SELECT name, email,created_at,location,occupation,phone_number, profile_url FROM users WHERE token = ?";
 
   try {
     const results = await db.query(query, [token]);
