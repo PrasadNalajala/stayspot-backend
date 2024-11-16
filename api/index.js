@@ -232,11 +232,10 @@ app.get("/api/user", async (req, res) => {
     return res.status(400).json({ message: "Token is required" });
   }
   const query =
-    "SELECT name, email,created_at,location,occupation,phone_number, profile_url FROM users WHERE token = ?";
+    "SELECT name, email,created_at,location,occupation,phone_number,bio, profile_url FROM users WHERE token = ?";
 
   try {
     const results = await db.query(query, [token]);
-    console.log(results);
     if (results.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
@@ -245,5 +244,47 @@ app.get("/api/user", async (req, res) => {
   } catch (error) {
     console.error("Error fetching user information:", error);
     return res.status(500).json({ error: "Failed to fetch user information" });
+  }
+});
+
+app.put("/api/user", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const { name, location, occupation, phone_number, bio, profile_url } =
+    req.body;
+
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const updateQuery = `
+      UPDATE users 
+      SET 
+        name = ?, 
+        location = ?, 
+        occupation = ?, 
+        phone_number = ?, 
+        bio = ?, 
+        profile_url = ?
+      WHERE 
+        token = ?`;
+    const [result] = await db.query(updateQuery, [
+      name,
+      location,
+      occupation,
+      phone_number,
+      bio,
+      profile_url,
+      token,
+    ]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({ message: "User updated successfully" });
+  } catch (error) {
+    console.error("Error updating user information:", error);
+    return res.status(500).json({ error: "Failed to update user information" });
   }
 });
