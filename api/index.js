@@ -158,7 +158,6 @@ app.get("/rentals", async (req, res) => {
 });
 
 app.post("/rentals", async (req, res) => {
-  console.log(req.body);
   const {
     title,
     location,
@@ -284,5 +283,37 @@ app.put("/api/user", async (req, res) => {
   } catch (error) {
     console.error("Error updating user information:", error);
     return res.status(500).json({ error: "Failed to update user information" });
+  }
+});
+
+app.post("/api/rental-details", async (req, res) => {
+  const { rental_id } = req.body;
+
+  if (!rental_id) {
+    return res.status(400).json({ message: "rental_id is required" });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT *
+      FROM users
+      JOIN rentals
+      ON users.id = rentals.user_id
+      WHERE rentals.id = ?;
+    `,
+      [rental_id]
+    );
+
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No data found for the given rental_id" });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error fetching user and rental details:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
