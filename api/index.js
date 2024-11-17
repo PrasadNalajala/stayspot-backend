@@ -158,6 +158,16 @@ app.get("/rentals", async (req, res) => {
 });
 
 app.post("/rentals", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const [rows] = await db.query("SELECT id, email FROM users WHERE token = ?", [
+    token,
+  ]);
+
+  if (rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const { id: user_id, email: contact_email } = rows[0];
   const {
     title,
     location,
@@ -172,7 +182,6 @@ app.post("/rentals", async (req, res) => {
     status,
     contact_name,
     contact_phone,
-    contact_email,
   } = req.body;
 
   try {
@@ -180,7 +189,7 @@ app.post("/rentals", async (req, res) => {
 
     const sql = `
             INSERT INTO rentals 
-            (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status)
+            (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status,user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
@@ -199,6 +208,7 @@ app.post("/rentals", async (req, res) => {
       availableFrom || null,
       amenitiesJSON,
       status,
+      user_id,
     ]);
 
     res.status(201).json({
