@@ -95,8 +95,6 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  console.log("email:", email);
-
   try {
     const [results] = await db.query("SELECT * FROM users WHERE email = ?", [
       email,
@@ -118,7 +116,7 @@ app.post("/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "30d" }
     );
-    console.log("Token generated:", token);
+    await db.query("UPDATE users SET token = ? WHERE id = ?", [token, user.id]);
     res.status(200).json({ message: "Login successful", token });
   } catch (error) {
     console.log("Catch error:", error);
