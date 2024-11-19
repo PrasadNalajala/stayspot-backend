@@ -190,7 +190,7 @@ app.post("/rentals", async (req, res) => {
     const sql = `
             INSERT INTO rentals 
             (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status,user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
         `;
 
     const [result] = await db.query(sql, [
