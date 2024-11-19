@@ -307,8 +307,8 @@ app.post("/api/rental-details", async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT *
-      FROM users
-      JOIN rentals
+      FROM rentals
+      JOIN users
       ON users.id = rentals.user_id
       WHERE rentals.id = ?;
     `,
