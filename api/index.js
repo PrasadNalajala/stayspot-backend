@@ -95,8 +95,6 @@ app.post("/register", async (req, res) => {
 
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  console.log("email:", email);
-
   try {
     const [results] = await db.query("SELECT * FROM users WHERE email = ?", [
       email,
@@ -118,7 +116,7 @@ app.post("/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "30d" }
     );
-    console.log("Token generated:", token);
+    await db.query("UPDATE users SET token = ? WHERE id = ?", [token, user.id]);
     res.status(200).json({ message: "Login successful", token });
   } catch (error) {
     console.log("Catch error:", error);
@@ -160,7 +158,16 @@ app.get("/rentals", async (req, res) => {
 });
 
 app.post("/rentals", async (req, res) => {
-  console.log(req.body);
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const [rows] = await db.query("SELECT id, email FROM users WHERE token = ?", [
+    token,
+  ]);
+
+  if (rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const { id: user_id, email: contact_email } = rows[0];
   const {
     title,
     location,
@@ -175,7 +182,6 @@ app.post("/rentals", async (req, res) => {
     status,
     contact_name,
     contact_phone,
-    contact_email,
   } = req.body;
 
   try {
@@ -183,8 +189,8 @@ app.post("/rentals", async (req, res) => {
 
     const sql = `
             INSERT INTO rentals 
-            (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status,user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
         `;
 
     const [result] = await db.query(sql, [
@@ -202,6 +208,7 @@ app.post("/rentals", async (req, res) => {
       availableFrom || null,
       amenitiesJSON,
       status,
+      user_id,
     ]);
 
     res.status(201).json({
@@ -286,5 +293,37 @@ app.put("/api/user", async (req, res) => {
   } catch (error) {
     console.error("Error updating user information:", error);
     return res.status(500).json({ error: "Failed to update user information" });
+  }
+});
+
+app.post("/api/rental-details", async (req, res) => {
+  const { rental_id } = req.body;
+
+  if (!rental_id) {
+    return res.status(400).json({ message: "rental_id is required" });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT *
+      FROM rentals
+      JOIN users
+      ON users.id = rentals.user_id
+      WHERE rentals.id = ?;
+    `,
+      [rental_id]
+    );
+
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No data found for the given rental_id" });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error fetching user and rental details:", error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
