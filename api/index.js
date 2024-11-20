@@ -190,7 +190,7 @@ app.post("/rentals", async (req, res) => {
     const sql = `
             INSERT INTO rentals 
             (title, location, price, bedrooms, bathrooms, description, size, imageUrl, contact_name, contact_phone, contact_email, available_from, amenities, status,user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)
         `;
 
     const [result] = await db.query(sql, [
@@ -307,8 +307,8 @@ app.post("/api/rental-details", async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT *
-      FROM users
-      JOIN rentals
+      FROM rentals
+      JOIN users
       ON users.id = rentals.user_id
       WHERE rentals.id = ?;
     `,
