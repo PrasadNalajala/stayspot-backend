@@ -7,7 +7,7 @@ const port = process.env.PORT || 3001;
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 const cors = require("cors");
 
 app.use(express.json());
@@ -27,20 +27,17 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-const db = mysql
-  .createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-  })
-  .promise();
-
+const db = mysql.createPool({
+  host: process.env.MYSQLHOST || "autorack.proxy.rlwy.net",
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "yVCxeSJXsYMHsWRKoVUeujqvTzbFRMnq",
+  database: process.env.MYSQL_DATABASE || "railway",
+  port: process.env.MYSQLPORT || 48730,
+});
 db.getConnection()
   .then((conn) => {
     console.log("Database connected successfully");
-    conn.release(); // Release the connection back to the pool
-    // Do something with the connection if needed
+    conn.release();
   })
   .catch((error) => {
     console.error("Error connecting to the database:", error);
