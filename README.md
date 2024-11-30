@@ -1,5 +1,4 @@
-```markdown
-# 🌟 StaySpot Backend - The Power Behind Your Rental Experience 🏡✨
+# 🌟 StaySpot Backend 🏡✨
 
 Welcome to the **StaySpot** backend! This Express.js application serves as the backbone for the StaySpot frontend, providing essential APIs to manage user authentication and property listings. 🚀
 
@@ -12,8 +11,8 @@ The StaySpot backend is built with the following technologies:
 - **Bcrypt**: For hashing passwords securely. 🔐
 - **jsonwebtoken**: For implementing authentication and authorization. 🛡️
 - **Nodemon**: For automatically restarting the server during development. 🔄
-```
-## 🚀 Getting Started
+
+# 🚀 Getting Started
 
 To set up the StaySpot backend, follow these steps:
 
