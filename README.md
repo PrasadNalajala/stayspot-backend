@@ -1,4 +1,4 @@
-# 🌟 StaySpot Backend 🏡✨
+# 🌟 StaySpot Backend 
 
 Welcome to the **StaySpot** backend! This Express.js application serves as the backbone for the StaySpot frontend, providing essential APIs to manage user authentication and property listings. 🚀
 
