@@ -33,6 +33,8 @@ const db = mysql.createPool({
   password: process.env.MYSQLPASSWORD || "yVCxeSJXsYMHsWRKoVUeujqvTzbFRMnq",
   database: process.env.MYSQL_DATABASE || "railway",
   port: process.env.MYSQLPORT || 48730,
+  jwtSecret :process.env.JWT_SECRET || "defaultSecretKey"
+
 });
 db.getConnection()
   .then((conn) => {
