@@ -326,3 +326,55 @@ app.post("/api/rental-details", async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 });
+
+app.post("/api/rentals/:rentalId/comments", async (req, res) => {
+  const { rentalId } = req.params;
+  const { comment } = req.body;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userRows[0].id;
+    const createdAt = new Date(); 
+    const sql = "INSERT INTO comments (rental_id, user_id, comment, created_at) VALUES (?, ?, ?, ?)";
+    await db.query(sql, [rentalId, userId, comment, createdAt]);
+
+    res.status(201).json({ message: "Comment posted successfully" });
+  } catch (error) {
+    console.error("Error posting comment:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/rentals/:rentalId/comments", async (req, res) => {
+  const { rentalId } = req.params;
+
+  try {
+    const sql = `
+      SELECT 
+        comments.comment, 
+        comments.created_at, 
+        users.name, 
+        users.profile_url, 
+        users.bio, 
+        users.occupation 
+      FROM comments 
+      JOIN users ON comments.user_id = users.id 
+      WHERE rental_id = ?`;
+      
+    const [comments] = await db.query(sql, [rentalId]);
+
+    res.status(200).json(comments);
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
