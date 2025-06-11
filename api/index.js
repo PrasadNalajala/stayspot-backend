@@ -124,35 +124,42 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/rentals", async (req, res) => {
-  const query = "SELECT * FROM rentals";
-  try {
-    const [result] = await db.query(query);
-    const formattedResult = result.map((rental) => ({
-      id: rental.id,
-      title: rental.title,
-      location: rental.location,
-      price: `₹${parseFloat(rental.price).toLocaleString()}/month`,
-      bedrooms: rental.bedrooms,
-      bathrooms: rental.bathrooms,
-      size: rental.size,
-      imageUrl: rental.imageUrl,
-      description: rental.description,
-      availableFrom: new Date(rental.available_from)
-        .toISOString()
-        .split("T")[0],
-      amenities: rental.amenities,
-      status: rental.status,
-      contact: {
-        name: rental.contact_name,
-        phone: `+91 ${rental.contact_phone}`,
-        email: rental.contact_email,
-      },
-    }));
+  const { location, price_min, price_max, bedrooms, bathrooms, status } = req.query;
 
-    res.json(formattedResult);
+  let query = "SELECT * FROM rentals WHERE 1=1"; 
+  const queryParams = [];
+
+  if (location) {
+    query += " AND location = ?";
+    queryParams.push(location);
+  }
+  if (price_min) {
+    query += " AND price >= ?";
+    queryParams.push(price_min);
+  }
+  if (price_max) {
+    query += " AND price <= ?";
+    queryParams.push(price_max);
+  }
+  if (bedrooms) {
+    query += " AND bedrooms = ?";
+    queryParams.push(bedrooms);
+  }
+  if (bathrooms) {
+    query += " AND bathrooms = ?";
+    queryParams.push(bathrooms);
+  }
+  if (status) {
+    query += " AND status = ?";
+    queryParams.push(status);
+  }
+
+  try {
+    const [results] = await db.query(query, queryParams);
+    res.status(200).json(results);
   } catch (error) {
     console.error("Error fetching rentals:", error);
-    res.status(500).send("Server Error");
+    res.status(500).json({ error: "Server error" });
   }
 });
 
