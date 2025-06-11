@@ -124,7 +124,7 @@ app.post("/login", async (req, res) => {
 });
 
 app.get("/rentals", async (req, res) => {
-  const { location, price_min, price_max, bedrooms, bathrooms, status } = req.query;
+  const { location, price_min, price_max, bedrooms, bathrooms, status, sort_by } = req.query;
 
   let query = `
     SELECT 
@@ -175,6 +175,9 @@ app.get("/rentals", async (req, res) => {
   if (status) {
     query += " AND rentals.status = ?";
     queryParams.push(status);
+  }
+  if (sort_by) {
+    query += ` ORDER BY ${mysql.escapeId(sort_by)} ASC`; 
   }
 
   try {
