@@ -126,31 +126,54 @@ app.post("/login", async (req, res) => {
 app.get("/rentals", async (req, res) => {
   const { location, price_min, price_max, bedrooms, bathrooms, status } = req.query;
 
-  let query = "SELECT * FROM rentals WHERE 1=1"; 
+  let query = `
+    SELECT 
+      rentals.id, 
+      rentals.title, 
+      rentals.location, 
+      rentals.price, 
+      rentals.description, 
+      rentals.size, 
+      rentals.imageUrl, 
+      rentals.available_from, 
+      rentals.amenities, 
+      rentals.status, 
+      rentals.bedrooms, 
+      rentals.bathrooms, 
+      rentals.contact_name, 
+      rentals.contact_phone, 
+      rentals.contact_email, 
+      users.name AS user_name, 
+      users.profile_url 
+    FROM rentals 
+    JOIN users ON users.id = rentals.user_id 
+    WHERE 1=1`; // Start with a base query
+
   const queryParams = [];
 
+  // Add filters based on query parameters
   if (location) {
-    query += " AND location = ?";
+    query += " AND rentals.location = ?";
     queryParams.push(location);
   }
   if (price_min) {
-    query += " AND price >= ?";
+    query += " AND rentals.price >= ?";
     queryParams.push(price_min);
   }
   if (price_max) {
-    query += " AND price <= ?";
+    query += " AND rentals.price <= ?";
     queryParams.push(price_max);
   }
   if (bedrooms) {
-    query += " AND bedrooms = ?";
+    query += " AND rentals.bedrooms = ?";
     queryParams.push(bedrooms);
   }
   if (bathrooms) {
-    query += " AND bathrooms = ?";
+    query += " AND rentals.bathrooms = ?";
     queryParams.push(bathrooms);
   }
   if (status) {
-    query += " AND status = ?";
+    query += " AND rentals.status = ?";
     queryParams.push(status);
   }
 
