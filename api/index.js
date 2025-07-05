@@ -411,3 +411,165 @@ app.get("/api/rentals/:rentalId/comments", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// Get user's own listings
+app.get("/api/user/rentals", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userRows[0].id;
+    
+    const sql = `
+      SELECT 
+        id, 
+        title, 
+        location, 
+        price, 
+        description, 
+        size, 
+        imageUrl, 
+        available_from, 
+        amenities, 
+        status, 
+        bedrooms, 
+        bathrooms, 
+        contact_name, 
+        contact_phone, 
+        contact_email,
+        created_at
+      FROM rentals 
+      WHERE user_id = ?
+      ORDER BY created_at DESC`;
+      
+    const [rentals] = await db.query(sql, [userId]);
+
+    res.status(200).json(rentals);
+  } catch (error) {
+    console.error("Error fetching user rentals:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.put("/api/rentals/:rentalId", async (req, res) => {
+  const { rentalId } = req.params;
+  const token = req.headers["authorization"]?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  const {
+    title,
+    location,
+    price,
+    bedrooms,
+    bathrooms,
+    size,
+    imageUrl,
+    description,
+    availableFrom,
+    amenities,
+    status,
+    contact_name,
+    contact_phone,
+  } = req.body;
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userRows[0].id;
+    
+    const [rentalRows] = await db.query("SELECT id FROM rentals WHERE id = ? AND user_id = ?", [rentalId, userId]);
+    if (rentalRows.length === 0) {
+      return res.status(404).json({ message: "Rental not found or you don't have permission to edit it" });
+    }
+
+    const amenitiesJSON = JSON.stringify(amenities);
+
+    const updateQuery = `
+      UPDATE rentals 
+      SET 
+        title = ?, 
+        location = ?, 
+        price = ?, 
+        bedrooms = ?, 
+        bathrooms = ?, 
+        description = ?, 
+        size = ?, 
+        imageUrl = ?, 
+        contact_name = ?, 
+        contact_phone = ?, 
+        available_from = ?, 
+        amenities = ?, 
+        status = ?
+      WHERE id = ? AND user_id = ?
+    `;
+
+    await db.query(updateQuery, [
+      title,
+      location,
+      price,
+      bedrooms,
+      bathrooms,
+      description,
+      size,
+      imageUrl || null,
+      contact_name,
+      contact_phone,
+      availableFrom || null,
+      amenitiesJSON,
+      status,
+      rentalId,
+      userId,
+    ]);
+
+    res.status(200).json({ message: "Rental updated successfully" });
+  } catch (error) {
+    console.error("Error updating rental:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Delete a rental 
+app.delete("/api/rentals/:rentalId", async (req, res) => {
+  const { rentalId } = req.params;
+  const token = req.headers["authorization"]?.split(" ")[1];
+  
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const userId = userRows[0].id;
+    const [rentalRows] = await db.query("SELECT id FROM rentals WHERE id = ? AND user_id = ?", [rentalId, userId]);
+    if (rentalRows.length === 0) {
+      return res.status(404).json({ message: "Rental not found or you don't have permission to delete it" });
+    }
+
+    await db.query("DELETE FROM comments WHERE rental_id = ?", [rentalId]);
+    
+    await db.query("DELETE FROM rentals WHERE id = ? AND user_id = ?", [rentalId, userId]);
+
+    res.status(200).json({ message: "Rental deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting rental:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
