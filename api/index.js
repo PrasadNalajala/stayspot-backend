@@ -615,10 +615,14 @@ app.post("/api/messages/:rentalId", async (req, res) => {
 
 app.get("/api/messages/:rentalId", async (req, res) => {
   const { rentalId } = req.params;
+  const { participantId } = req.query;
   const token = req.headers["authorization"]?.split(" ")[1];
 
   if (!token) {
     return res.status(400).json({ message: "Token is required" });
+  }
+  if (!participantId) {
+    return res.status(400).json({ message: "participantId is required" });
   }
 
   try {
@@ -628,15 +632,10 @@ app.get("/api/messages/:rentalId", async (req, res) => {
     }
     const userId = userRows[0].id;
 
-    const [rentalRows] = await db.query("SELECT user_id FROM rentals WHERE id = ?", [rentalId]);
-    if (rentalRows.length === 0) {
-      return res.status(404).json({ message: "Rental not found" });
-    }
-    const ownerId = rentalRows[0].user_id;
-
+    // Only fetch messages between the current user and the participant for this rental
     const [messages] = await db.query(
       `SELECT * FROM messages WHERE rental_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) ORDER BY timestamp ASC`,
-      [rentalId, userId, ownerId, ownerId, userId]
+      [rentalId, userId, participantId, participantId, userId]
     );
     res.status(200).json({ success: true, messages });
   } catch (error) {
@@ -678,6 +677,126 @@ app.get("/api/conversations", async (req, res) => {
     res.status(200).json({ success: true, conversations: detailedConversations });
   } catch (error) {
     console.error("Error fetching conversations:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 1. Create or get a conversation for a rental between the current user and the owner
+app.post("/api/conversations", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const { rentalId } = req.body;
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  if (!rentalId) return res.status(400).json({ message: "rentalId is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    const [rentalRows] = await db.query("SELECT id, user_id FROM rentals WHERE id = ?", [rentalId]);
+    if (rentalRows.length === 0) return res.status(404).json({ message: "Rental not found" });
+    const ownerId = rentalRows[0].user_id;
+    if (userId === ownerId) return res.status(400).json({ message: "Owner cannot start a conversation with themselves" });
+    const [convRows] = await db.query(
+      "SELECT * FROM conversations WHERE rental_id = ? AND user_id = ? AND owner_id = ?",
+      [rentalId, userId, ownerId]
+    );
+    let conversation;
+    if (convRows.length > 0) {
+      conversation = convRows[0];
+    } else {
+      const [result] = await db.query(
+        "INSERT INTO conversations (rental_id, user_id, owner_id) VALUES (?, ?, ?)",
+        [rentalId, userId, ownerId]
+      );
+      const [newConvRows] = await db.query("SELECT * FROM conversations WHERE id = ?", [result.insertId]);
+      conversation = newConvRows[0];
+    }
+    res.status(200).json({ conversation });
+  } catch (error) {
+    console.error("Error creating/getting conversation:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 2. Get all conversations for the current user (as user or owner)
+app.get("/api/conversations", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    const [conversations] = await db.query(
+      `SELECT c.*, r.title AS rental_title, r.location AS rental_location, r.imageUrl AS rental_imageUrl, 
+              u1.name AS user_name, u2.name AS owner_name
+       FROM conversations c
+       JOIN rentals r ON c.rental_id = r.id
+       JOIN users u1 ON c.user_id = u1.id
+       JOIN users u2 ON c.owner_id = u2.id
+       WHERE c.user_id = ? OR c.owner_id = ?
+       ORDER BY c.last_updated DESC`,
+      [userId, userId]
+    );
+    res.status(200).json({ conversations });
+  } catch (error) {
+    console.error("Error fetching conversations:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 3. Get all messages for a conversation (if user is a participant)
+app.get("/api/conversations/:conversationId/messages", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const { conversationId } = req.params;
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    const [convRows] = await db.query("SELECT * FROM conversations WHERE id = ?", [conversationId]);
+    if (convRows.length === 0) return res.status(404).json({ message: "Conversation not found" });
+    const conv = convRows[0];
+    if (conv.user_id !== userId && conv.owner_id !== userId) {
+      return res.status(403).json({ message: "Not authorized to view this conversation" });
+    }
+    const [messages] = await db.query(
+      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC",
+      [conversationId]
+    );
+    res.status(200).json({ messages });
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 4. Send a message in a conversation (if user is a participant)
+app.post("/api/conversations/:conversationId/messages", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const { conversationId } = req.params;
+  const { content } = req.body;
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  if (!content) return res.status(400).json({ message: "Message content is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    const [convRows] = await db.query("SELECT * FROM conversations WHERE id = ?", [conversationId]);
+    if (convRows.length === 0) return res.status(404).json({ message: "Conversation not found" });
+    const conv = convRows[0];
+    if (conv.user_id !== userId && conv.owner_id !== userId) {
+      return res.status(403).json({ message: "Not authorized to send message in this conversation" });
+    }
+    await db.query(
+      "INSERT INTO messages (conversation_id, sender_id, content) VALUES (?, ?, ?)",
+      [conversationId, userId, content]
+    );
+    await db.query(
+      "UPDATE conversations SET last_updated = CURRENT_TIMESTAMP WHERE id = ?",
+      [conversationId]
+    );
+    res.status(201).json({ message: "Message sent" });
+  } catch (error) {
+    console.error("Error sending message:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
