@@ -573,3 +573,111 @@ app.delete("/api/rentals/:rentalId", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+// --- Messaging Endpoints ---
+
+app.post("/api/messages/:rentalId", async (req, res) => {
+  const { rentalId } = req.params;
+  const { content } = req.body;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+  if (!content) {
+    return res.status(400).json({ message: "Message content is required" });
+  }
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const senderId = userRows[0].id;
+
+    const [rentalRows] = await db.query("SELECT user_id FROM rentals WHERE id = ?", [rentalId]);
+    if (rentalRows.length === 0) {
+      return res.status(404).json({ message: "Rental not found" });
+    }
+    const receiverId = rentalRows[0].user_id;
+
+    const [result] = await db.query(
+      "INSERT INTO messages (rental_id, sender_id, receiver_id, content) VALUES (?, ?, ?, ?)",
+      [rentalId, senderId, receiverId, content]
+    );
+    const [messageRows] = await db.query("SELECT * FROM messages WHERE id = ?", [result.insertId]);
+    res.status(201).json({ success: true, message: messageRows[0] });
+  } catch (error) {
+    console.error("Error sending message:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/messages/:rentalId", async (req, res) => {
+  const { rentalId } = req.params;
+  const token = req.headers["authorization"]?.split(" ")[1];
+
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const userId = userRows[0].id;
+
+    const [rentalRows] = await db.query("SELECT user_id FROM rentals WHERE id = ?", [rentalId]);
+    if (rentalRows.length === 0) {
+      return res.status(404).json({ message: "Rental not found" });
+    }
+    const ownerId = rentalRows[0].user_id;
+
+    const [messages] = await db.query(
+      `SELECT * FROM messages WHERE rental_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)) ORDER BY timestamp ASC`,
+      [rentalId, userId, ownerId, ownerId, userId]
+    );
+    res.status(200).json({ success: true, messages });
+  } catch (error) {
+    console.error("Error fetching messages:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/conversations", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) {
+    return res.status(400).json({ message: "Token is required" });
+  }
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const userId = userRows[0].id;
+
+    const [conversations] = await db.query(
+      `SELECT DISTINCT rental_id FROM messages WHERE sender_id = ? OR receiver_id = ? ORDER BY timestamp DESC`,
+      [userId, userId]
+    );
+
+    const detailedConversations = [];
+    for (const convo of conversations) {
+      const [rentalRows] = await db.query(
+        `SELECT rentals.*, users.name AS owner_name, users.email AS owner_email FROM rentals JOIN users ON rentals.user_id = users.id WHERE rentals.id = ?`,
+        [convo.rental_id]
+      );
+      if (rentalRows.length > 0) {
+        detailedConversations.push({
+          rental: rentalRows[0],
+          rentalId: convo.rental_id
+        });
+      }
+    }
+    res.status(200).json({ success: true, conversations: detailedConversations });
+  } catch (error) {
+    console.error("Error fetching conversations:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
