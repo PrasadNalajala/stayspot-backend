@@ -271,7 +271,7 @@ app.get("/api/user", async (req, res) => {
     return res.status(400).json({ message: "Token is required" });
   }
   const query =
-    "SELECT name, email,created_at,location,occupation,phone_number,bio, profile_url FROM users WHERE token = ?";
+    "SELECT id, name, email,created_at,location,occupation,phone_number,bio, profile_url FROM users WHERE token = ?";
 
   try {
     const results = await db.query(query, [token]);
