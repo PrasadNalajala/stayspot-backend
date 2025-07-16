@@ -646,35 +646,29 @@ app.get("/api/messages/:rentalId", async (req, res) => {
 
 app.get("/api/conversations", async (req, res) => {
   const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) {
-    return res.status(400).json({ message: "Token is required" });
-  }
+  if (!token) return res.status(400).json({ message: "Token is required" });
   try {
     const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
-    if (userRows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
     const userId = userRows[0].id;
-
     const [conversations] = await db.query(
-      `SELECT DISTINCT rental_id FROM messages WHERE sender_id = ? OR receiver_id = ? ORDER BY timestamp DESC`,
+      `SELECT c.*, r.title AS rental_title, r.location AS rental_location, r.imageUrl AS rental_imageUrl, 
+              u1.name AS user_name, u2.name AS owner_name,
+              m.content AS last_message, m.timestamp AS last_message_time
+       FROM conversations c
+       JOIN rentals r ON c.rental_id = r.id
+       JOIN users u1 ON c.user_id = u1.id
+       JOIN users u2 ON c.owner_id = u2.id
+       LEFT JOIN messages m ON m.id = (
+           SELECT id FROM messages 
+           WHERE conversation_id = c.id 
+           ORDER BY timestamp DESC LIMIT 1
+       )
+       WHERE c.user_id = ? OR c.owner_id = ?
+       ORDER BY c.last_updated DESC`,
       [userId, userId]
     );
-
-    const detailedConversations = [];
-    for (const convo of conversations) {
-      const [rentalRows] = await db.query(
-        `SELECT rentals.*, users.name AS owner_name, users.email AS owner_email FROM rentals JOIN users ON rentals.user_id = users.id WHERE rentals.id = ?`,
-        [convo.rental_id]
-      );
-      if (rentalRows.length > 0) {
-        detailedConversations.push({
-          rental: rentalRows[0],
-          rentalId: convo.rental_id
-        });
-      }
-    }
-    res.status(200).json({ success: true, conversations: detailedConversations });
+    res.status(200).json({ conversations });
   } catch (error) {
     console.error("Error fetching conversations:", error);
     res.status(500).json({ error: "Server error" });
