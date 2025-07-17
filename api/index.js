@@ -781,9 +781,16 @@ app.post("/api/conversations/:conversationId/messages", async (req, res) => {
       return res.status(403).json({ message: "Not authorized to send message in this conversation" });
     }
     const rentalId = conv.rental_id;
+    const senderId = userId;
+    let receiverId;
+    if (conv.user_id === senderId) {
+      receiverId = conv.owner_id;
+    } else {
+      receiverId = conv.user_id;
+    }
     await db.query(
-      "INSERT INTO messages (conversation_id, rental_id, sender_id, content) VALUES (?, ?, ?, ?)",
-      [conversationId, rentalId, userId, content]
+      "INSERT INTO messages (conversation_id, rental_id, sender_id, receiver_id, content) VALUES (?, ?, ?, ?, ?)",
+      [conversationId, rentalId, senderId, receiverId, content]
     );
     await db.query(
       "UPDATE conversations SET last_updated = CURRENT_TIMESTAMP WHERE id = ?",
