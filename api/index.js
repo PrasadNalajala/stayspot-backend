@@ -752,6 +752,12 @@ app.get("/api/conversations/:conversationId/messages", async (req, res) => {
     if (conv.user_id !== userId && conv.owner_id !== userId) {
       return res.status(403).json({ message: "Not authorized to view this conversation" });
     }
+    // Mark all unread messages for this user in this conversation as read
+    await db.query(
+      "UPDATE messages SET is_read = TRUE WHERE conversation_id = ? AND receiver_id = ? AND is_read = FALSE",
+      [conversationId, userId]
+    );
+    // Fetch all messages
     const [messages] = await db.query(
       "SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC",
       [conversationId]
@@ -799,6 +805,67 @@ app.post("/api/conversations/:conversationId/messages", async (req, res) => {
     res.status(201).json({ message: "Message sent" });
   } catch (error) {
     console.error("Error sending message:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
+app.post("/api/messages/:messageId/read", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  const { messageId } = req.params;
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    // Get the message to find conversation and timestamp
+    const [msgRows] = await db.query("SELECT conversation_id, receiver_id, timestamp FROM messages WHERE id = ?", [messageId]);
+    if (msgRows.length === 0) return res.status(404).json({ message: "Message not found" });
+    const msg = msgRows[0];
+    if (msg.receiver_id !== userId) return res.status(403).json({ message: "Not authorized" });
+    // Mark this and all older messages in the same conversation as read
+    await db.query(
+      "UPDATE messages SET is_read = TRUE WHERE conversation_id = ? AND receiver_id = ? AND timestamp <= ?",
+      [msg.conversation_id, userId, msg.timestamp]
+    );
+    res.status(200).json({ message: "Message and all older messages marked as read" });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get all unread messages for the current user
+app.get("/api/messages/unread", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    const [messages] = await db.query(
+      "SELECT * FROM messages WHERE receiver_id = ? AND is_read = FALSE",
+      [userId]
+    );
+    res.status(200).json({ messages });
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Mark all messages as read for the current user
+app.post("/api/messages/mark-all-read", async (req, res) => {
+  const token = req.headers["authorization"]?.split(" ")[1];
+  if (!token) return res.status(400).json({ message: "Token is required" });
+  try {
+    const [userRows] = await db.query("SELECT id FROM users WHERE token = ?", [token]);
+    if (userRows.length === 0) return res.status(404).json({ message: "User not found" });
+    const userId = userRows[0].id;
+    await db.query(
+      "UPDATE messages SET is_read = TRUE WHERE receiver_id = ? AND is_read = FALSE",
+      [userId]
+    );
+    res.status(200).json({ message: "All messages marked as read" });
+  } catch (error) {
     res.status(500).json({ error: "Server error" });
   }
 });
